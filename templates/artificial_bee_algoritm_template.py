@@ -18,6 +18,8 @@ from pymoo.util.display import Display
 from pymoo.util.termination.default import SingleObjectiveDefaultTermination
 from pymoo.optimize import minimize
 from pymoo.model.callback import Callback
+from pymoo.model.population import Population
+from pymoo.model.individual import Individual
 import matplotlib.pyplot as plt
 from algorithms.artificial_bee_algorithm import ArtificialBeeAlgorithm
 from util.neighborhood_search import NeighborhoodSearch
@@ -70,11 +72,16 @@ class MyCallback(Callback):
 
 
 class MySearch(NeighborhoodSearch):
-    def _do(self, problem, X, **kwargs):
-        for x in X:
-            change_list = np.random.choice(len(x), 2, replace=False)
-            x[change_list[0]], x[change_list[1]] = x[change_list[1]], x[change_list[0]]
-        return X
+    def _do(self, problem, pop, **kwargs):
+        new_pop = Population(len(pop))
+        for index, individual in enumerate(pop):
+            x = individual.get('X')  # 直接取值，可以理解为已经deepcopy(x)
+            # 随机选择两个位置
+            i, j = np.random.choice(len(x), 2, replace=False)
+            # 交换
+            x[i], x[j] = x[j], x[i]
+            new_pop[index].set('X', x)
+        return new_pop
 
 
 def test():

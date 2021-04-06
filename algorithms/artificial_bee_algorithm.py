@@ -40,12 +40,12 @@ def get_relation(individual_a, individual_b):
         individual_b(Individual): individual b
 
     Returns:
-        tuple(0|1|-1)
+        int: 1 means a is better than b; -1: worse; 0: equal
 
     """
     a_f = individual_a.get('F')
     b_f = individual_b.get('F')
-    if hasattr(a_f, "__len__"):
+    if not hasattr(a_f, "__len__"):
         a_f = [a_f]
         b_f = [b_f]
     return Dominator.get_relation(a_f, b_f)

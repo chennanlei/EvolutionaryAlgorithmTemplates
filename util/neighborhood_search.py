@@ -2,7 +2,6 @@
 neighborhood search
 
 """
-import copy
 from abc import abstractmethod
 from pymoo.model.population import Population
 from pymoo.model.individual import Individual
@@ -32,8 +31,7 @@ class NeighborhoodSearch:
         # make sure the object is a population
         if is_individual or is_numpy_array:
             pop = Population().create(pop)
-        val = self._do(problem, pop.get('X'), **kwargs)
-        new_pop = Population.new("X", val)
+        new_pop = self._do(problem, pop, **kwargs)
         algorithm = kwargs.get('algorithm')
         if algorithm and algorithm.repair:
             new_pop = algorithm.repair.do(problem, new_pop)
@@ -47,16 +45,15 @@ class NeighborhoodSearch:
 
     @staticmethod
     @abstractmethod
-    def _do(problem, X, **kwargs):
+    def _do(problem, pop, **kwargs):
         """
-        根据problem，对X的每一行进行领域搜索
+        根据problem，对pop中的每一个个体进行进行领域搜索
         Args:
             problem(Problem): 用于获取问题相关信息
-            X(np.ndarray): n行 每一行为每个个体编码
+            pop(Population): 群体
             **kwargs:
 
         Returns:
-            np.ndarray: new X
+            Population: new Population
         """
-        new_x = copy.deepcopy(X)
-        return new_x
+        return pop.copy(deep=True)
