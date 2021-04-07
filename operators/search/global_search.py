@@ -8,7 +8,6 @@ from util.neighborhood_search import NeighborhoodSearch
 from pymoo.model.duplicate import DefaultDuplicateElimination, NoDuplicateElimination
 
 
-
 class Partition:
     def do(self, problem, pop, n_groups=1, **kwargs):
         return self._do(problem, pop, n_groups, **kwargs)
@@ -51,19 +50,21 @@ class GlobalSearch(InfillCriterion):
     def __init__(self,
                  partition=None,
                  search=None,
+                 meme_size=1,
                  **kwargs):
         super().__init__(**kwargs)
 
         self.partition = partition if partition is not None else IsometricFitnessPartition()
         self.search = search
+        self.meme_size = meme_size if meme_size is not None else 1
 
     @abstractmethod
     def search_for_groups(self, problem, pops, **kwargs):
         return pops
 
-    def _do(self, problem, pop, n_offsprings, meme_size=1, **kwargs):
+    def _do(self, problem, pop, n_offsprings, **kwargs):
         # Group large populations into small populations
-        pops = self.partition.do(problem, pop, meme_size)
+        pops = self.partition.do(problem, pop, self.meme_size)
 
         # the local search in small population
         pops = self.search_for_groups(problem, pops, **kwargs)

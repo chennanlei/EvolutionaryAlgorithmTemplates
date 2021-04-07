@@ -131,10 +131,10 @@ def main():
     search = Search(sampling=get_sampling('perm_random'),
                     repair=PermRepairByP())
     mating = SFLAGlobalSearch(search=search,
+                              meme_size=5,
                               d_max=3,
                               lx=5)
     algorithm = ShuffledAlgorithm(pop_size=20,
-                                  meme_size=5,
                                   mating=mating,
                                   eliminate_duplicates=True,
                                   repair=SequentialPermRepair(),
