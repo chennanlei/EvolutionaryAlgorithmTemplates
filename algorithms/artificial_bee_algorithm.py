@@ -9,6 +9,8 @@
 @Last Modified time: 2021/4/3 15:28
 @Description：artificial_bee_algorithm
 """
+import numpy as np
+from pymoo.model.population import Population
 from pymoo.model.algorithm import Algorithm, filter_optimum
 from pymoo.model.duplicate import DefaultDuplicateElimination, NoDuplicateElimination
 from pymoo.model.repair import NoRepair
@@ -105,14 +107,14 @@ class ArtificialBeeAlgorithm(Algorithm):
         self.pop = None
 
     def create_new(self, pop_size):
+        if pop_size == 0:
+            return Population()
         # create the population
         pop = self.initialization.do(self.problem, pop_size, algorithm=self)
         # set the created generation
         pop.set("created_gen", self.n_gen)
         # then evaluate using the objective function
         self.evaluator.eval(self.problem, pop, **{"algorithm": self})
-        if len(pop) == 1:
-            return pop[0]
         return pop
 
     def _initialize(self):
@@ -121,8 +123,7 @@ class ArtificialBeeAlgorithm(Algorithm):
 
     def _next(self):
         # 1. employees phase
-        for index in range(len(self.pop)):
-            self.send_employee(index)
+        self.send_employee(np.arange(self.pop_size))
 
         # 2. onlookers phase
         self.send_onlookers()
@@ -130,24 +131,30 @@ class ArtificialBeeAlgorithm(Algorithm):
         # 3. scouts phase
         self.send_scouts()
 
-    def send_employee(self, index):
-        bee = self.pop[index]
-        # do neighborhood search for bee
-        new_bee = self.neighborhood_search.do(self.problem, bee, algorithm=self)
-        # set created generation of new bee
-        new_bee.set('created_gen', self.n_gen)
+    def send_employee(self, indexes):
+        if len(indexes) == 0:
+            return
+        # do neighborhood search for bees
+        new_pop = self.neighborhood_search.do(self.problem, self.pop[indexes], algorithm=self)
+        # set created generation for new bees
+        new_pop.set('created_gen', self.n_gen)
         # evaluate new bee
-        self.evaluator.eval(self.problem, new_bee, **{"algorithm": self})
-        if self.compare(bee, new_bee) == -1:
-            self.pop[index] = new_bee
+        self.evaluator.eval(self.problem, new_pop, **{"algorithm": self})
+        for i, new_bee in enumerate(new_pop):
+            if self.compare(self.pop[indexes[i]], new_bee) == -1:
+                self.pop[indexes[i]] = new_bee
 
     def send_onlookers(self):
-        selected_indexes = self.selection.do(self.pop, n_select=self.n_onlookers, n_parents=1)
-        for [index] in selected_indexes:
-            self.send_employee(index)
+        selected_indexes = self.selection.do(self.pop, n_select=self.n_onlookers, n_parents=1).reshape(-1)
+        self.send_employee(selected_indexes)
 
     def send_scouts(self):
         best_bees = filter_optimum(self.pop, least_infeasible=True)
+        to_be_replaced = []
         for index, bee in enumerate(self.pop):
             if self.bee_termination.has_terminated(bee, best_bees=best_bees, algorithm=self):
-                self.pop[index] = self.create_new(1)
+                to_be_replaced.append(index)
+        new_pop = self.create_new(len(to_be_replaced))
+        for i, index in enumerate(to_be_replaced):
+            self.pop[index] = new_pop[i]
+

@@ -23,6 +23,7 @@ from pymoo.model.individual import Individual
 import matplotlib.pyplot as plt
 from algorithms.artificial_bee_algorithm import ArtificialBeeAlgorithm
 from util.neighborhood_search import NeighborhoodSearch
+import copy
 
 
 class MySampling(Sampling):
@@ -75,7 +76,7 @@ class MySearch(NeighborhoodSearch):
     def _do(self, problem, pop, **kwargs):
         new_pop = Population(len(pop))
         for index, individual in enumerate(pop):
-            x = individual.get('X')  # 直接取值，可以理解为已经deepcopy(x)
+            x = copy.deepcopy(individual.get('X'))  # deepcopy(x)
             # 随机选择两个位置
             i, j = np.random.choice(len(x), 2, replace=False)
             # 交换
