@@ -5,7 +5,6 @@ from pymoo.model.population import Population
 from pymoo.model.evaluator import Evaluator
 from pymoo.model.infill import InfillCriterion
 from util.neighborhood_search import NeighborhoodSearch
-from pymoo.model.duplicate import DefaultDuplicateElimination, NoDuplicateElimination
 
 
 class Partition:
@@ -41,8 +40,12 @@ class IsometricPartition(Partition):
 
 class IsometricFitnessPartition(IsometricPartition):
     def _do(self, problem, pop, n_groups=1, **kwargs):
-        pop = Population.create(*sorted(pop, key=lambda x: x.get('F')[0], reverse=True))
+        F = pop.get("F")
 
+        if F.shape[1] != 1:
+            raise ValueError("The Partition can only used for single objective single!")
+
+        pop = pop[np.argsort(F[:, 0])]
         return super(IsometricFitnessPartition, self)._do(problem, pop, n_groups, **kwargs)
 
 
@@ -55,8 +58,8 @@ class GlobalSearch(InfillCriterion):
         super().__init__(**kwargs)
 
         self.partition = partition if partition is not None else IsometricFitnessPartition()
-        self.search = search
-        self.meme_size = meme_size if meme_size is not None else 1
+        self.search = search if search is not None else NeighborhoodSearch()
+        self.meme_size = meme_size
 
     @abstractmethod
     def search_for_groups(self, problem, pops, **kwargs):
@@ -72,3 +75,24 @@ class GlobalSearch(InfillCriterion):
         pop = reduce(lambda x, y: Population.merge(x, y), pops)
 
         return pop
+
+
+class GlobalSearchByBest(GlobalSearch):
+    """
+    In each group, the worst individual is renewed by the best in the current
+    group and/or the global best
+
+    """
+    def __init__(self, generations=1, **kwargs):
+        super().__init__(**kwargs)
+        self.generations = generations
+
+    def search_for_groups(self, problem, pops, **kwargs):
+        algorithm = kwargs.get("algorithm")
+
+        # record the global best individual
+        pg = algorithm.opt[0]
+
+        for _ in range(self.generations):
+            pops = [self.search.do(problem, pop, pg=pg, **kwargs) for pop in pops]
+        return pops

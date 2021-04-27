@@ -7,12 +7,9 @@ from operators.repair.perm_repair import SequentialPermRepair, PermRepairByP
 from algorithms.shuffled_algorithm import ShuffledAlgorithm
 import matplotlib.pyplot as plt
 from pymoo.util.display import Display
-from operators.search.global_search import GlobalSearch
-from abc import abstractmethod
+from operators.search.global_search import GlobalSearchByBest
 from pymoo.model.population import Population, Individual
-from pymoo.model.evaluator import Evaluator
-from util.neighborhood_search import NeighborhoodSearch
-
+from operators.search.group_search import GroupSearch
 
 np.random.seed(10)
 
@@ -43,56 +40,12 @@ class FJPDisplay(Display):
         self.output.append("mean", "{:.2f}".format(np.mean(pop_f)))
 
 
-class Search(NeighborhoodSearch):
-    def __init__(self, sampling, repair, evaluator=None):
-        self.sampling = sampling
-        self.evaluator = evaluator if evaluator is not None else Evaluator(skip_already_evaluated=False)
-        self.repair = repair
+class SFLASearch(GroupSearch):
+    def __init__(self, sampling, repair, evaluator=None, **kwargs):
+        super(SFLASearch, self).__init__(sampling, repair, evaluator, **kwargs)
 
-    def _do(self, problem, pop, **kwargs):
-        # global best
-        pg = kwargs.get("pg")
-
-        # get the best and worst individual in meme_group
-        pb = pop[np.nanargmin(pop.get("F"))]
-        pw = pop[np.nanargmax(pop.get("F"))]
-
-        flag = self.replace(problem, pop, pw, pb=pb, **kwargs)
-
-        if flag:
-            return pop
-
-        flag = self.replace(problem, pop, pw, pb=pg, **kwargs)
-        if flag:
-            return pop
-
-        self.replace(problem, pop, pw, **kwargs)
-
-        return pop
-
-    def replace(self, problem, pop, pw, **kwargs) -> bool:
+    def renew(self, pw: Individual, pb: Individual, **kwargs) -> Population:
         d_max = kwargs.get("d_max")
-        pb = kwargs.get("pb")
-
-        k = np.nanargmax(pop.get("F"))
-        if pb is None:
-            ind = self.sampling.do(problem, 1)[0]
-            self.evaluator.eval(problem, ind)
-            pop[k] = ind
-        else:
-            _pb = self.renew(pw, pb, d_max)
-            _pb = self.repair.do(problem, _pb, P=pb.get("X"))
-
-            self.evaluator.eval(problem, _pb)
-            ind = _pb[0]
-
-            if ind.get("F") < pw.get("F"):
-                pop[k] = ind
-                return True
-        return False
-
-    @ abstractmethod
-    def renew(self, pw: Individual, pb: Individual, d_max) -> Population:
         new_pb = []
         rand = np.random.random()
         for elem_w, elem_b in zip(pw.get('X'), pb.get('X')):
@@ -106,20 +59,13 @@ class Search(NeighborhoodSearch):
         return Population.new("X", np.atleast_2d(np.array(new_pb)))
 
 
-class SFLAGlobalSearch(GlobalSearch):
-    def __init__(self, d_max, lx, **kwargs):
-        super(SFLAGlobalSearch, self).__init__(**kwargs)
+class SFLAGlobalSearch(GlobalSearchByBest):
+    def __init__(self, generations, d_max, **kwargs):
+        super(SFLAGlobalSearch, self).__init__(generations, **kwargs)
         self.d_max = d_max
-        self.lx = lx
 
     def search_for_groups(self, problem, pops, **kwargs):
-        algorithm = kwargs.get("algorithm")
-
-        # record the global best individual
-        pg = algorithm.opt[0]
-
-        for _ in range(self.lx):
-            pops = [self.search.do(problem, pop, pg=pg, d_max=self.d_max) for pop in pops]
+        pops = super(SFLAGlobalSearch, self).search_for_groups(problem, pops, d_max=self.d_max, **kwargs)
         return pops
 
 
@@ -128,12 +74,12 @@ def main():
     n_jobs = 20
 
     problem = create_random_flowshop_problem(n_machines=n_machines, n_jobs=n_jobs)
-    search = Search(sampling=get_sampling('perm_random'),
-                    repair=PermRepairByP())
+    search = SFLASearch(sampling=get_sampling('perm_random'),
+                        repair=PermRepairByP())
     mating = SFLAGlobalSearch(search=search,
                               meme_size=5,
                               d_max=3,
-                              lx=5)
+                              generations=5)
     algorithm = ShuffledAlgorithm(pop_size=20,
                                   mating=mating,
                                   eliminate_duplicates=True,
